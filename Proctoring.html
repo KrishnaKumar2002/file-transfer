@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Recording</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        .video-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+        #recordedVideo {
+            width: 100%;
+            height: auto;
+            max-width: 800px; /* Adjust max-width as needed */
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .btn {
+            margin: 0 10px;
+        }
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Screen Recording</h1>
+        <div class="button-container">
+            <button id="startRecord" class="btn btn-primary">Start Recording</button>
+            <button id="stopRecord" class="btn btn-danger" disabled>Stop Recording</button>
+        </div>
+        <div class="video-container">
+            <video id="recordedVideo" controls></video>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        document.getElementById('startRecord').addEventListener('click', async () => {
+            try {
+                // Request the user to share their entire screen
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        displaySurface: "monitor", // Request to capture the entire screen
+                        cursor: "always" // Optional: Capture the cursor in the recording
+                    },
+                    audio: true // Request to capture audio
+                });
+
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm; codecs=vp9,opus' // Use webm format for better audio support
+                });
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const file = new File([blob], 'recorded_video.webm', { type: 'video/webm' });
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    // Upload the recorded file to the server
+                    try {
+                        const response = await fetch('http://localhost:8000/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await response.json();
+                        console.log('File uploaded:', data);
+                        
+                        // Display the recorded video
+                        const videoUrl = URL.createObjectURL(blob);
+                        const videoElement = document.getElementById('recordedVideo');
+                        videoElement.src = videoUrl;
+                        videoElement.play();
+                    } catch (error) {
+                        console.error('Error uploading file:', error);
+                    }
+                };
+
+                mediaRecorder.start();
+                document.getElementById('startRecord').disabled = true;
+                document.getElementById('stopRecord').disabled = false;
+            } catch (error) {
+                console.error('Error accessing media devices.', error);
+            }
+        });
+
+        document.getElementById('stopRecord').addEventListener('click', () => {
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+            }
+            document.getElementById('startRecord').disabled = false;
+            document.getElementById('stopRecord').disabled = true;
+        });
+    </script>
+</body>
+</html>
