@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Screen Recording</title>
+    <title>Screen Recording with Object Detection</title>
     <!-- Bootstrap CSS -->
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -16,6 +16,7 @@
             border-radius: 5px;
             overflow: hidden;
             background-color: #f8f9fa;
+            position: relative;
         }
         #recordedVideo {
             width: 100%;
@@ -36,19 +37,37 @@
         .container {
             max-width: 900px;
         }
+        .detections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+        .bounding-box {
+            position: absolute;
+            border: 2px solid red;
+            background-color: rgba(255, 0, 0, 0.2);
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="text-center mb-4">Screen Recording</h1>
+        <h1 class="text-center mb-4">Screen Recording with Object Detection</h1>
         <div class="button-container">
             <button id="startRecord" class="btn btn-primary">Start Recording</button>
             <button id="stopRecord" class="btn btn-danger" disabled>Stop Recording</button>
         </div>
         <div class="video-container">
             <video id="recordedVideo" controls></video>
+            <div id="detections" class="detections"></div>
         </div>
     </div>
+
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
     <!-- Bootstrap JS and dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
@@ -58,6 +77,36 @@
     <script>
         let mediaRecorder;
         let recordedChunks = [];
+        let model;
+        const detectionsElement = document.getElementById('detections');
+
+        // Load TensorFlow.js and the COCO-SSD model
+        async function loadModel() {
+            model = await cocoSsd.load();
+            console.log('COCO-SSD model loaded');
+        } 
+
+        loadModel();
+
+        // Function to detect phones and tablets in the video stream
+        async function detectObjects(videoElement) {
+            const predictions = await model.detect(videoElement);
+            detectionsElement.innerHTML = ''; // Clear previous detections
+
+            predictions.forEach(prediction => {
+                if (prediction.class === 'cell phone' || prediction.class === 'tablet') {
+                    const { bbox, class: className } = prediction;
+                    const [x, y, width, height] = bbox;
+                    const boxElement = document.createElement('div');
+                    boxElement.className = 'bounding-box';
+                    boxElement.style.left = `${x}px`;
+                    boxElement.style.top = `${y}px`;
+                    boxElement.style.width = `${width}px`;
+                    boxElement.style.height = `${height}px`;
+                    detectionsElement.appendChild(boxElement);
+                }
+            });
+        }
 
         document.getElementById('startRecord').addEventListener('click', async () => {
             try {
@@ -65,16 +114,13 @@
                 const stream = await navigator.mediaDevices.getDisplayMedia({
                     video: {
                         displaySurface: "monitor", // Request to capture the entire screen
-                        cursor: "always" // Optional: Capture the cursor in the recording
+                        cursor: "always", // Optional: Capture the cursor in the recording
+                        width: { ideal: 1280 },  // Ideal width
+                        height: { ideal: 720 }, // Ideal height
+                        frameRate: { ideal: 1 } // Ideal frame rate
                     },
                     audio: true // Request to capture audio
                 });
-
-                const videoConstraints = {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 1 }
-                };
 
                 mediaRecorder = new MediaRecorder(stream, {
                     mimeType: 'video/webm; codecs=vp8,opus' // Adjust codec for compression
@@ -114,6 +160,19 @@
                 mediaRecorder.start();
                 document.getElementById('startRecord').disabled = true;
                 document.getElementById('stopRecord').disabled = false;
+
+                // Set up an interval to detect objects every second
+                const videoElement = document.getElementById('recordedVideo');
+                const detectInterval = setInterval(() => {
+                    if (videoElement && !videoElement.paused) {
+                        detectObjects(videoElement);
+                    }
+                }, 1000);
+
+                videoElement.addEventListener('pause', () => {
+                    clearInterval(detectInterval);
+                });
+
             } catch (error) {
                 console.error('Error accessing media devices.', error);
             }
