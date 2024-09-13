@@ -1,5 +1,4 @@
 from uuid import uuid4
-
 import boto3
 from botocore.exceptions import ClientError
 import magic
@@ -7,10 +6,11 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Response, UploadFile, status
 from loguru import logger
 
-# session = boto3.Session(
-#     aws_access_key_id='ACCESS_KEY',
-#     aws_secret_access_key='SECRET_KEY',
-# )
+# AWS S3 configuration
+session = boto3.Session(
+      aws_access_key_id='AKIATQDYY6GOHNT4LLPT',
+      aws_secret_access_key='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',
+)
 
 KB = 1024
 MB = 1024 * KB
@@ -18,19 +18,18 @@ MB = 1024 * KB
 SUPPORTED_FILE_TYPES = {
     'image/png': 'png',
     'image/jpeg': 'jpg',
-    'application/pdf': 'pdf'
+    'application/pdf': 'pdf',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
 }
 
-AWS_BUCKET = 'my-bucket-124'
-
+AWS_BUCKET = 'creya-proctoring'  # Correct bucket name
 s3 = boto3.resource('s3')
 bucket = s3.Bucket(AWS_BUCKET)
-
 
 async def s3_upload(contents: bytes, key: str):
     logger.info(f'Uploading {key} to s3')
     bucket.put_object(Key=key, Body=contents)
-
 
 async def s3_download(key: str):
     try:
@@ -40,11 +39,9 @@ async def s3_download(key: str):
 
 app = FastAPI()
 
-
 @app.get('/')
 async def home():
     return {'message': 'Hello from file-upload 😄👋'}
-
 
 @app.post('/upload')
 async def upload(file: UploadFile | None = None):
@@ -57,10 +54,10 @@ async def upload(file: UploadFile | None = None):
     contents = await file.read()
     size = len(contents)
 
-    if not 0 < size <= 1 * MB:
+    if not 0 < size <= 100 * MB:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail='Supported file size is 0 - 1 MB'
+            detail='Supported file size is 0 - 100 MB'
         )
 
     file_type = magic.from_buffer(buffer=contents, mime=True)
@@ -72,7 +69,6 @@ async def upload(file: UploadFile | None = None):
     file_name = f'{uuid4()}.{SUPPORTED_FILE_TYPES[file_type]}'
     await s3_upload(contents=contents, key=file_name)
     return {'file_name': file_name}
-
 
 @app.get('/download')
 async def download(file_name: str | None = None):
