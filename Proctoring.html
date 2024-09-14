@@ -92,9 +92,12 @@
         async function detectObjects(videoElement) {
             const predictions = await model.detect(videoElement);
             detectionsElement.innerHTML = ''; // Clear previous detections
-
+            
+            console.log(predictions);
+            
             predictions.forEach(prediction => {
                 if (prediction.class === 'cell phone' || prediction.class === 'tablet') {
+                    // || prediction.class=== 'laptop'
                     const { bbox, class: className } = prediction;
                     const [x, y, width, height] = bbox;
                     const boxElement = document.createElement('div');

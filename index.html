@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webcam Face and Mobile Detection</title>
+  <!-- Load TensorFlow.js and coco-ssd model -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"> </script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"> </script>
+  <!-- Load Face API -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <style>
+    video {
+      width: 640px;
+      height: 480px;
+      border: 2px solid black;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Webcam Face and Mobile Detection</h1>
+  <video id="webcam" autoplay></video>
+  <canvas id="overlay"></canvas>
+  <script>
+    // Access webcam video stream and set up the canvas
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('overlay');
+    const context = canvas.getContext('2d');
+
+    // Set up webcam
+    if (navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          video.srcObject = stream;
+
+          // Set canvas size to match video size
+          video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+          };
+
+          // Load both models: coco-ssd for mobile detection and face-api for face detection
+          Promise.all([
+            cocoSsd.load(),
+            faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models')
+          ]).then(([model]) => {
+            // Continuously detect faces and mobile phones
+            setInterval(async () => {
+              // Detect faces using face-api
+              const faceDetections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+
+              // Clear the previous canvas drawing
+              context.clearRect(0, 0, canvas.width, canvas.height);
+
+              // Draw face detections
+              faceDetections.forEach(result => {
+                const { x, y, width, height } = result.box;
+                context.strokeStyle = '#00FF00';
+                context.lineWidth = 2;
+                context.strokeRect(x, y, width, height);
+              });
+
+              // Detect mobile phones using coco-ssd
+              model.detect(video).then(predictions => {
+                predictions.forEach(prediction => {
+                  const detectedObject = prediction.class;
+                  const [x, y, width, height] = prediction.bbox;
+
+                  // Draw bounding boxes for detected objects
+                  context.strokeStyle = '#FF0000';
+                  context.lineWidth = 2;
+                  context.strokeRect(x, y, width, height);
+
+                  // Show alert if a mobile phone is detected
+                  if (detectedObject === 'cell phone') {
+                    alert(`Mobile Phone Detected`);
+                  }
+                });
+              });
+            }, 1000); // Detect every second
+          });
+        })
+        .catch(err => {
+          console.error("Webcam access error:", err);
+          alert("Webcam not accessible. Please check your browser settings.");
+        });
+    } else {
+      alert("Webcam not supported on this browser.");
+    }
+  </script>
+</body>
+</html>
