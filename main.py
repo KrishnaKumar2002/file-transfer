@@ -10,8 +10,8 @@ from loguru import logger
 
 # AWS S3 configuration
 session = boto3.Session(
-    aws_access_key_id='AKIATQDYY6GOHNT4LLPT',
-    aws_secret_access_key='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',
+    aws_access_key_id='',
+    aws_secret_access_key='',
     region_name='us-east-1'  # Ensure you specify the correct region
 )
 
