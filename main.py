@@ -16,7 +16,7 @@ session = boto3.Session(
 )
 
 s3 = boto3.resource('s3')
-AWS_BUCKET = 'creya-proctoring'  # Replace with your actual bucket name
+AWS_BUCKET = ''  # Replace with your actual bucket name
 bucket = s3.Bucket(AWS_BUCKET)
 
 KB = 1024
